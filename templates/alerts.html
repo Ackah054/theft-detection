@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts - ShopGuard AI{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <a href="/" class="flex items-center gap-2 px-3 py-1 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors">
+                        <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                        Back to Dashboard
+                    </a>
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="shield" class="h-6 w-6 text-blue-600"></i>
+                        <h1 class="text-xl font-bold">Alert Management</h1>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-1 bg-red-50 border border-red-200 rounded-full">
+                    <span class="text-sm text-red-600 font-medium"><span id="active-count">0</span> Active Alerts</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow-sm border p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Total Alerts</p>
+                        <p class="text-2xl font-bold" id="total-alerts">0</p>
+                    </div>
+                    <i data-lucide="bell" class="h-8 w-8 text-gray-400"></i>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Active</p>
+                        <p class="text-2xl font-bold text-red-600" id="active-alerts">0</p>
+                    </div>
+                    <i data-lucide="alert-triangle" class="h-8 w-8 text-red-600"></i>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Acknowledged</p>
+                        <p class="text-2xl font-bold text-orange-600" id="acknowledged-alerts">0</p>
+                    </div>
+                    <i data-lucide="clock" class="h-8 w-8 text-orange-600"></i>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Resolved</p>
+                        <p class="text-2xl font-bold text-green-600" id="resolved-alerts">0</p>
+                    </div>
+                    <i data-lucide="check-circle" class="h-8 w-8 text-green-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow-sm border mb-6">
+            <div class="p-4 border-b">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <i data-lucide="filter" class="h-5 w-5"></i>
+                    Filters & Search
+                </h2>
+            </div>
+            <div class="p-4">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div class="relative">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400"></i>
+                        <input type="text" id="search-input" placeholder="Search alerts..." class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <select id="status-filter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="all">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="acknowledged">Acknowledged</option>
+                        <option value="resolved">Resolved</option>
+                    </select>
+
+                    <select id="type-filter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="all">All Types</option>
+                        <option value="theft">Theft</option>
+                        <option value="suspicious">Suspicious</option>
+                        <option value="system">System</option>
+                    </select>
+
+                    <select id="severity-filter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="all">All Severities</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+
+                    <button id="clear-filters" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts List -->
+        <div class="bg-white rounded-lg shadow-sm border">
+            <div class="p-4 border-b">
+                <h2 class="text-lg font-semibold">Alerts (<span id="filtered-count">0</span>)</h2>
+                <p class="text-sm text-gray-600">Manage and track all security alerts from your detection system</p>
+            </div>
+            <div class="p-4">
+                <div id="alerts-container" class="space-y-4">
+                    <div id="loading" class="text-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p class="text-gray-600">Loading alerts...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    let allAlerts = [];
+    let filteredAlerts = [];
+
+    // DOM elements
+    const alertsContainer = document.getElementById('alerts-container');
+    const loadingDiv = document.getElementById('loading');
+    const searchInput = document.getElementById('search-input');
+    const statusFilter = document.getElementById('status-filter');
+    const typeFilter = document.getElementById('type-filter');
+    const severityFilter = document.getElementById('severity-filter');
+    const clearFiltersBtn = document.getElementById('clear-filters');
+
+    // Load alerts on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchAlerts();
+        
+        // Add event listeners for filters
+        searchInput.addEventListener('input', filterAlerts);
+        statusFilter.addEventListener('change', filterAlerts);
+        typeFilter.addEventListener('change', filterAlerts);
+        severityFilter.addEventListener('change', filterAlerts);
+        clearFiltersBtn.addEventListener('click', clearFilters);
+    });
+
+    async function fetchAlerts() {
+        try {
+            const response = await fetch('/api/alerts');
+            if (response.ok) {
+                const data = await response.json();
+                allAlerts = data.alerts;
+                filteredAlerts = [...allAlerts];
+                updateStats();
+                renderAlerts();
+            }
+        } catch (error) {
+            console.error('Error fetching alerts:', error);
+            alertsContainer.innerHTML = '<div class="text-center py-8 text-red-600">Error loading alerts</div>';
+        } finally {
+            loadingDiv.style.display = 'none';
+        }
+    }
+
+    function updateStats() {
+        const stats = {
+            total: allAlerts.length,
+            active: allAlerts.filter(a => a.status === 'active').length,
+            acknowledged: allAlerts.filter(a => a.status === 'acknowledged').length,
+            resolved: allAlerts.filter(a => a.status === 'resolved').length
+        };
+
+        document.getElementById('total-alerts').textContent = stats.total;
+        document.getElementById('active-alerts').textContent = stats.active;
+        document.getElementById('acknowledged-alerts').textContent = stats.acknowledged;
+        document.getElementById('resolved-alerts').textContent = stats.resolved;
+        document.getElementById('active-count').textContent = stats.active;
+        document.getElementById('filtered-count').textContent = filteredAlerts.length;
+    }
+
+    function filterAlerts() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const statusValue = statusFilter.value;
+        const typeValue = typeFilter.value;
+        const severityValue = severityFilter.value;
+
+        filteredAlerts = allAlerts.filter(alert => {
+            const matchesSearch = !searchTerm || 
+                alert.description.toLowerCase().includes(searchTerm) ||
+                alert.location.toLowerCase().includes(searchTerm);
+            
+            const matchesStatus = statusValue === 'all' || alert.status === statusValue;
+            const matchesType = typeValue === 'all' || alert.type === typeValue;
+            const matchesSeverity = severityValue === 'all' || alert.severity === severityValue;
+
+            return matchesSearch && matchesStatus && matchesType && matchesSeverity;
+        });
+
+        document.getElementById('filtered-count').textContent = filteredAlerts.length;
+        renderAlerts();
+    }
+
+    function clearFilters() {
+        searchInput.value = '';
+        statusFilter.value = 'all';
+        typeFilter.value = 'all';
+        severityFilter.value = 'all';
+        filterAlerts();
+    }
+
+    function renderAlerts() {
+        if (filteredAlerts.length === 0) {
+            alertsContainer.innerHTML = `
+                <div class="text-center py-8">
+                    <i data-lucide="bell" class="h-12 w-12 mx-auto mb-4 text-gray-400"></i>
+                    <p class="text-lg font-medium mb-2">No alerts found</p>
+                    <p class="text-gray-600">${allAlerts.length === 0 ? 'No alerts have been generated yet.' : 'Try adjusting your filters to see more results.'}</p>
+                </div>
+            `;
+            lucide.createIcons();
+            return;
+        }
+
+        const alertsHTML = filteredAlerts.map(alert => {
+            const statusColors = getStatusColors(alert.status);
+            const severityBadge = getSeverityBadge(alert.severity);
+            const icon = getAlertIcon(alert.type);
+
+            return `
+                <div class="p-4 rounded-lg border ${statusColors.bg} ${statusColors.border}">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-3 flex-1">
+                            <div class="mt-1">${icon}</div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <h3 class="font-medium text-sm ${statusColors.text}">${alert.description}</h3>
+                                    ${severityBadge}
+                                    ${alert.confidence > 0 ? `<span class="text-xs px-2 py-1 bg-white border border-gray-200 text-gray-600 rounded">${alert.confidence}%</span>` : ''}
+                                </div>
+                                <div class="flex items-center gap-4 text-xs text-gray-500">
+                                    <span>${alert.location}</span>
+                                    <span>•</span>
+                                    <span class="timestamp" data-timestamp="${alert.timestamp}"></span>
+                                    <span>•</span>
+                                    <span class="capitalize">${alert.type}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${getActionButtons(alert)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        alertsContainer.innerHTML = alertsHTML;
+        
+        // Update timestamps
+        document.querySelectorAll('.timestamp').forEach(el => {
+            el.textContent = formatTimestamp(el.dataset.timestamp);
+        });
+        
+        lucide.createIcons();
+    }
+
+    function getStatusColors(status) {
+        switch (status) {
+            case 'active':
+                return {
+                    bg: 'bg-red-50',
+                    border: 'border-red-200',
+                    text: 'text-red-900'
+                };
+            case 'acknowledged':
+                return {
+                    bg: 'bg-orange-50',
+                    border: 'border-orange-200',
+                    text: 'text-orange-900'
+                };
+            case 'resolved':
+                return {
+                    bg: 'bg-green-50',
+                    border: 'border-green-200',
+                    text: 'text-green-900'
+                };
+            default:
+                return {
+                    bg: 'bg-gray-50',
+                    border: 'border-gray-200',
+                    text: 'text-gray-900'
+                };
+        }
+    }
+
+    function getSeverityBadge(severity) {
+        const colors = {
+            high: 'bg-red-100 text-red-600 border-red-200',
+            medium: 'bg-orange-100 text-orange-600 border-orange-200',
+            low: 'bg-gray-100 text-gray-600 border-gray-200'
+        };
+        
+        return `<span class="text-xs px-2 py-1 border rounded ${colors[severity] || colors.low}">${severity.toUpperCase()}</span>`;
+    }
+
+    function getAlertIcon(type) {
+        switch (type) {
+            case 'theft':
+                return '<i data-lucide="alert-triangle" class="h-4 w-4 text-red-600"></i>';
+            case 'suspicious':
+                return '<i data-lucide="eye" class="h-4 w-4 text-orange-600"></i>';
+            case 'system':
+                return '<i data-lucide="bell" class="h-4 w-4 text-blue-600"></i>';
+            default:
+                return '<i data-lucide="alert-triangle" class="h-4 w-4 text-gray-600"></i>';
+        }
+    }
+
+    function getActionButtons(alert) {
+        if (alert.status === 'active') {
+            return `
+                <button onclick="updateAlertStatus('${alert.id}', 'acknowledged')" class="text-xs px-3 py-1 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors">
+                    Acknowledge
+                </button>
+                <button onclick="updateAlertStatus('${alert.id}', 'resolved')" class="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                    Resolve
+                </button>
+            `;
+        } else if (alert.status === 'acknowledged') {
+            return `
+                <button onclick="updateAlertStatus('${alert.id}', 'resolved')" class="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                    Resolve
+                </button>
+            `;
+        } else {
+            return `
+                <span class="text-xs px-2 py-1 bg-green-100 text-green-600 border border-green-200 rounded flex items-center gap-1">
+                    <i data-lucide="check-circle" class="h-3 w-3"></i>
+                    Resolved
+                </span>
+            `;
+        }
+    }
+
+    async function updateAlertStatus(alertId, newStatus) {
+        try {
+            const response = await fetch(`/api/alerts/${alertId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (response.ok) {
+                // Update local data
+                const alertIndex = allAlerts.findIndex(a => a.id === alertId);
+                if (alertIndex !== -1) {
+                    allAlerts[alertIndex].status = newStatus;
+                    updateStats();
+                    filterAlerts();
+                }
+            }
+        } catch (error) {
+            console.error('Error updating alert:', error);
+            alert('Error updating alert status');
+        }
+    }
+</script>
+{% endblock %}

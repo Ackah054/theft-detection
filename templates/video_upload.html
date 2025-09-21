@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}Video Upload - ShopGuard AI{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <a href="/" class="flex items-center gap-2 px-3 py-1 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors">
+                        <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                        Back to Dashboard
+                    </a>
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="shield" class="h-6 w-6 text-blue-600"></i>
+                        <h1 class="text-xl font-bold">Video Upload & Analysis</h1>
+                    </div>
+                </div>
+                <div id="threat-badge" class="hidden flex items-center gap-2 px-3 py-1 rounded-full">
+                    <span class="text-sm font-medium">Threat Level: <span id="threat-level-text">--</span></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Video Upload & Player -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Upload Section -->
+                <div id="upload-section" class="bg-white rounded-lg shadow-sm border">
+                    <div class="p-4 border-b">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">
+                            <i data-lucide="upload" class="h-5 w-5"></i>
+                            Upload Video for Analysis
+                        </h2>
+                        <p class="text-sm text-gray-600">Upload CCTV footage or recorded videos to detect theft and suspicious activities</p>
+                    </div>
+                    <div class="p-4">
+                        <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors cursor-pointer">
+                            <i data-lucide="file-video" class="h-12 w-12 mx-auto mb-4 text-gray-400"></i>
+                            <p class="text-lg font-medium mb-2">Drop your video here or click to browse</p>
+                            <p class="text-sm text-gray-600 mb-4">Supports MP4, AVI, MOV, and other common video formats</p>
+                            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto">
+                                <i data-lucide="upload" class="h-4 w-4"></i>
+                                Select Video File
+                            </button>
+                        </div>
+                        <input type="file" id="file-input" accept="video/*" class="hidden">
+                    </div>
+                </div>
+
+                <!-- Video Player -->
+                <div id="video-section" class="bg-white rounded-lg shadow-sm border hidden">
+                    <div class="p-4 border-b">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-lg font-semibold flex items-center gap-2">
+                                    <i data-lucide="file-video" class="h-5 w-5"></i>
+                                    <span id="video-filename">Video File</span>
+                                </h2>
+                                <p class="text-sm text-gray-600">Video ready for analysis • <span id="video-size">--</span> MB</p>
+                            </div>
+                            <button id="reset-btn" class="flex items-center gap-2 px-3 py-1 text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                <i data-lucide="rotate-ccw" class="h-4 w-4"></i>
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-4 space-y-4">
+                        <!-- Video Container -->
+                        <div class="relative bg-black rounded-lg overflow-hidden" style="aspect-ratio: 16/9;">
+                            <video id="video-player" class="w-full h-full object-contain" controls></video>
+                        </div>
+
+                        <!-- Analysis Controls -->
+                        <div class="flex gap-3">
+                            <button id="analyze-btn" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                                <i data-lucide="eye" class="h-4 w-4"></i>
+                                Start Analysis
+                            </button>
+                            <button id="export-btn" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 hidden">
+                                <i data-lucide="download" class="h-4 w-4"></i>
+                                Export Results
+                            </button>
+                        </div>
+
+                        <!-- Analysis Progress -->
+                        <div id="progress-section" class="space-y-2 hidden">
+                            <div class="flex justify-between text-sm">
+                                <span>Analyzing video frames...</span>
+                                <span id="progress-text">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Results -->
+            <div class="space-y-6">
+                <!-- Analysis Summary -->
+                <div id="summary-section" class="bg-white rounded-lg shadow-sm border hidden">
+                    <div class="p-4 border-b">
+                        <h3 class="text-lg font-semibold">Analysis Summary</h3>
+                    </div>
+                    <div class="p-4 space-y-4">
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-600">Total Frames:</span>
+                                <p class="font-medium" id="total-frames">--</p>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Processing Time:</span>
+                                <p class="font-medium" id="processing-time">--</p>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Detections:</span>
+                                <p class="font-medium text-red-600" id="detection-count">--</p>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Avg. Confidence:</span>
+                                <p class="font-medium" id="avg-confidence">--</p>
+                            </div>
+                        </div>
+                        <div class="pt-2">
+                            <div id="threat-level-badge" class="w-full text-center px-3 py-2 rounded-lg font-medium">
+                                Overall Threat: <span id="overall-threat">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detection Timeline -->
+                <div id="timeline-section" class="bg-white rounded-lg shadow-sm border hidden">
+                    <div class="p-4 border-b">
+                        <h3 class="text-lg font-semibold">Detection Timeline</h3>
+                        <p class="text-sm text-gray-600">Click on any detection to jump to that moment</p>
+                    </div>
+                    <div class="p-4">
+                        <div id="detections-list" class="space-y-3 max-h-96 overflow-y-auto">
+                            <!-- Detections will be populated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Instructions -->
+                <div id="instructions-section" class="bg-white rounded-lg shadow-sm border">
+                    <div class="p-4 border-b">
+                        <h3 class="text-lg font-semibold">How It Works</h3>
+                    </div>
+                    <div class="p-4 space-y-3 text-sm text-gray-600">
+                        <div class="flex items-start gap-2">
+                            <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-medium flex-shrink-0">1</div>
+                            <p>Upload your CCTV footage or recorded video file</p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-medium flex-shrink-0">2</div>
+                            <p>Our AI analyzes each frame for suspicious activities</p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-medium flex-shrink-0">3</div>
+                            <p>Review detailed results with timestamps and confidence scores</p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-medium flex-shrink-0">4</div>
+                            <p>Export analysis reports for documentation</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    let selectedFile = null;
+    let analysisResults = null;
+    let videoPlayer = document.getElementById('video-player');
+
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const uploadSection = document.getElementById('upload-section');
+    const videoSection = document.getElementById('video-section');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const exportBtn = document.getElementById('export-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const progressSection = document.getElementById('progress-section');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+
+    // File handling
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-blue-400', 'bg-blue-50');
+    });
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+    });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('video/')) {
+            handleFileSelect(file);
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('video/')) {
+            handleFileSelect(file);
+        } else {
+            alert('Please select a valid video file');
+        }
+    });
+
+    function handleFileSelect(file) {
+        selectedFile = file;
+        const videoUrl = URL.createObjectURL(file);
+        
+        document.getElementById('video-filename').textContent = file.name;
+        document.getElementById('video-size').textContent = (file.size / (1024 * 1024)).toFixed(1);
+        videoPlayer.src = videoUrl;
+        
+        uploadSection.classList.add('hidden');
+        videoSection.classList.remove('hidden');
+        document.getElementById('instructions-section').classList.add('hidden');
+        
+        // Reset analysis state
+        analysisResults = null;
+        document.getElementById('summary-section').classList.add('hidden');
+        document.getElementById('timeline-section').classList.add('hidden');
+        exportBtn.classList.add('hidden');
+    }
+
+    resetBtn.addEventListener('click', () => {
+        selectedFile = null;
+        analysisResults = null;
+        videoPlayer.src = '';
+        fileInput.value = '';
+        
+        uploadSection.classList.remove('hidden');
+        videoSection.classList.add('hidden');
+        document.getElementById('summary-section').classList.add('hidden');
+        document.getElementById('timeline-section').classList.add('hidden');
+        document.getElementById('instructions-section').classList.remove('hidden');
+        document.getElementById('threat-badge').classList.add('hidden');
+        progressSection.classList.add('hidden');
+        exportBtn.classList.add('hidden');
+    });
+
+    analyzeBtn.addEventListener('click', startAnalysis);
+
+    async function startAnalysis() {
+        if (!selectedFile) return;
+        
+        analyzeBtn.disabled = true;
+        analyzeBtn.innerHTML = '<div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div> Analyzing...';
+        progressSection.classList.remove('hidden');
+        
+        // Simulate progress
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 10;
+            if (progress > 100) progress = 100;
+            
+            progressBar.style.width = progress + '%';
+            progressText.textContent = Math.floor(progress) + '%';
+            
+            if (progress >= 100) {
+                clearInterval(progressInterval);
+                completeAnalysis();
+            }
+        }, 200);
+    }
+
+    function completeAnalysis() {
+        // Mock analysis results
+        analysisResults = {
+            totalFrames: Math.floor(Math.random() * 1500) + 1500,
+            processingTime: Math.floor(Math.random() * 30) + 30,
+            detections: [
+                {
+                    timestamp: 45.2,
+                    confidence: 87,
+                    detected: true,
+                    description: 'Suspicious behavior detected - person concealing item'
+                },
+                {
+                    timestamp: 127.8,
+                    confidence: 72,
+                    detected: true,
+                    description: 'Potential theft activity - item removal without payment'
+                },
+                {
+                    timestamp: 203.5,
+                    confidence: 91,
+                    detected: true,
+                    description: 'High confidence theft detection - concealment behavior'
+                }
+            ],
+            overallThreatLevel: 'High',
+            averageConfidence: 83
+        };
+        
+        displayResults();
+        
+        analyzeBtn.disabled = false;
+        analyzeBtn.innerHTML = '<i data-lucide="eye" class="h-4 w-4"></i> Analysis Complete';
+        exportBtn.classList.remove('hidden');
+        progressSection.classList.add('hidden');
+        
+        lucide.createIcons();
+    }
+
+    function displayResults() {
+        // Update summary
+        document.getElementById('total-frames').textContent = analysisResults.totalFrames.toLocaleString();
+        document.getElementById('processing-time').textContent = analysisResults.processingTime + 's';
+        document.getElementById('detection-count').textContent = analysisResults.detections.length;
+        document.getElementById('avg-confidence').textContent = analysisResults.averageConfidence + '%';
+        document.getElementById('overall-threat').textContent = analysisResults.overallThreatLevel;
+        
+        // Update threat level styling
+        const threatBadge = document.getElementById('threat-level-badge');
+        const headerThreatBadge = document.getElementById('threat-badge');
+        const threatLevelText = document.getElementById('threat-level-text');
+        
+        if (analysisResults.overallThreatLevel === 'High') {
+            threatBadge.className = 'w-full text-center px-3 py-2 rounded-lg font-medium bg-red-100 text-red-600';
+            headerThreatBadge.className = 'flex items-center gap-2 px-3 py-1 bg-red-100 text-red-600 rounded-full';
+        } else if (analysisResults.overallThreatLevel === 'Medium') {
+            threatBadge.className = 'w-full text-center px-3 py-2 rounded-lg font-medium bg-orange-100 text-orange-600';
+            headerThreatBadge.className = 'flex items-center gap-2 px-3 py-1 bg-orange-100 text-orange-600 rounded-full';
+        } else {
+            threatBadge.className = 'w-full text-center px-3 py-2 rounded-lg font-medium bg-green-100 text-green-600';
+            headerThreatBadge.className = 'flex items-center gap-2 px-3 py-1 bg-green-100 text-green-600 rounded-full';
+        }
+        
+        threatLevelText.textContent = analysisResults.overallThreatLevel;
+        headerThreatBadge.classList.remove('hidden');
+        
+        // Update detections timeline
+        const detectionsList = document.getElementById('detections-list');
+        detectionsList.innerHTML = '';
+        
+        analysisResults.detections.forEach((detection, index) => {
+            const detectionDiv = document.createElement('div');
+            detectionDiv.className = 'p-3 rounded-lg border bg-red-50 border-red-200 cursor-pointer hover:bg-red-100 transition-colors';
+            detectionDiv.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <i data-lucide="alert-triangle" class="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0"></i>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <i data-lucide="clock" class="h-3 w-3 text-red-600"></i>
+                            <span class="text-sm font-medium text-red-900">${formatTime(detection.timestamp)}</span>
+                            <span class="text-xs px-2 py-1 bg-white border border-red-200 text-red-600 rounded">${detection.confidence}%</span>
+                        </div>
+                        <p class="text-xs text-red-700">${detection.description}</p>
+                    </div>
+                </div>
+            `;
+            
+            detectionDiv.addEventListener('click', () => {
+                videoPlayer.currentTime = detection.timestamp;
+            });
+            
+            detectionsList.appendChild(detectionDiv);
+        });
+        
+        document.getElementById('summary-section').classList.remove('hidden');
+        document.getElementById('timeline-section').classList.remove('hidden');
+        
+        lucide.createIcons();
+    }
+
+    exportBtn.addEventListener('click', () => {
+        if (!analysisResults) return;
+        
+        const data = {
+            filename: selectedFile?.name,
+            analysis: analysisResults,
+            exportDate: new Date().toISOString()
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `analysis-${selectedFile?.name || 'video'}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+</script>
+{% endblock %}

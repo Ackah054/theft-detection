@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <i data-lucide="shield" class="h-8 w-8 text-blue-600"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">ShopGuard AI</h1>
+                        <p class="text-sm text-gray-600">Advanced Theft Detection System</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-200 rounded-full">
+                    <i data-lucide="activity" class="h-3 w-3 text-green-600"></i>
+                    <span class="text-sm text-green-600 font-medium">System Active</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Active Cameras</p>
+                        <p class="text-2xl font-bold">{{ stats.activeCameras }}/{{ stats.totalCameras }}</p>
+                        <p class="text-xs text-gray-500">Monitoring live feeds</p>
+                    </div>
+                    <i data-lucide="camera" class="h-8 w-8 text-gray-400"></i>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Today's Alerts</p>
+                        <p class="text-2xl font-bold text-orange-600">{{ stats.alertsToday }}</p>
+                        <p class="text-xs text-gray-500">Suspicious activities detected</p>
+                    </div>
+                    <i data-lucide="alert-triangle" class="h-8 w-8 text-orange-600"></i>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Detection Accuracy</p>
+                        <p class="text-2xl font-bold text-green-600">{{ stats.detectionAccuracy }}%</p>
+                        <p class="text-xs text-gray-500">AI model performance</p>
+                    </div>
+                    <i data-lucide="eye" class="h-8 w-8 text-green-600"></i>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">System Status</p>
+                        <p class="text-2xl font-bold text-green-600">Online</p>
+                        <p class="text-xs text-gray-500">All systems operational</p>
+                    </div>
+                    <i data-lucide="activity" class="h-8 w-8 text-green-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Actions -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Live Camera Monitoring -->
+            <div class="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
+                <div class="p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="p-2 bg-blue-100 rounded-lg">
+                            <i data-lucide="camera" class="h-6 w-6 text-blue-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold">Live Camera Monitoring</h3>
+                            <p class="text-sm text-gray-600">Monitor live camera feeds with real-time theft detection</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                        <h4 class="font-medium mb-2">Features:</h4>
+                        <ul class="text-sm text-gray-600 space-y-1">
+                            <li>• Real-time video analysis</li>
+                            <li>• Instant theft detection alerts</li>
+                            <li>• Multiple camera support</li>
+                            <li>• Live confidence scoring</li>
+                        </ul>
+                    </div>
+                    
+                    <a href="/live-monitor" class="block">
+                        <button class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                            <i data-lucide="camera" class="h-4 w-4"></i>
+                            Start Live Monitoring
+                        </button>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Video Upload Analysis -->
+            <div class="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
+                <div class="p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="p-2 bg-purple-100 rounded-lg">
+                            <i data-lucide="upload" class="h-6 w-6 text-purple-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold">Video Upload Analysis</h3>
+                            <p class="text-sm text-gray-600">Upload recorded videos for detailed theft analysis</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                        <h4 class="font-medium mb-2">Features:</h4>
+                        <ul class="text-sm text-gray-600 space-y-1">
+                            <li>• Batch video processing</li>
+                            <li>• Detailed analysis reports</li>
+                            <li>• Timeline-based detection</li>
+                            <li>• Export detection results</li>
+                        </ul>
+                    </div>
+                    
+                    <a href="/video-upload" class="block">
+                        <button class="w-full bg-white border border-gray-300 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                            <i data-lucide="upload" class="h-4 w-4"></i>
+                            Upload & Analyze Video
+                        </button>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Management -->
+        <div class="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow mb-8">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-orange-100 rounded-lg">
+                            <i data-lucide="alert-triangle" class="h-6 w-6 text-orange-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold">Alert Management</h3>
+                            <p class="text-sm text-gray-600">View, manage, and track all security alerts from your detection system</p>
+                        </div>
+                    </div>
+                    <a href="/alerts">
+                        <button class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                            View All Alerts
+                        </button>
+                    </a>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="text-center p-4 bg-gray-50 rounded-lg">
+                        <p class="text-2xl font-bold text-red-600">{{ stats.alertsToday }}</p>
+                        <p class="text-sm text-gray-600">Active Alerts</p>
+                    </div>
+                    <div class="text-center p-4 bg-gray-50 rounded-lg">
+                        <p class="text-2xl font-bold text-green-600">{{ stats.detectionAccuracy }}%</p>
+                        <p class="text-sm text-gray-600">Detection Accuracy</p>
+                    </div>
+                    <div class="text-center p-4 bg-gray-50 rounded-lg">
+                        <p class="text-2xl font-bold text-blue-600">24/7</p>
+                        <p class="text-sm text-gray-600">Monitoring</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-lg shadow-sm border">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold mb-2">Recent Activity</h3>
+                <p class="text-sm text-gray-600 mb-4">Latest detection events and system updates</p>
+                
+                <div class="space-y-4">
+                    {% for alert in recent_alerts %}
+                    <div class="flex items-center gap-4 p-3 {% if alert.severity == 'high' %}bg-red-50 border border-red-200{% elif alert.severity == 'medium' %}bg-orange-50 border border-orange-200{% else %}bg-green-50 border border-green-200{% endif %} rounded-lg">
+                        <i data-lucide="alert-triangle" class="h-5 w-5 {% if alert.severity == 'high' %}text-red-600{% elif alert.severity == 'medium' %}text-orange-600{% else %}text-green-600{% endif %}"></i>
+                        <div class="flex-1">
+                            <p class="font-medium {% if alert.severity == 'high' %}text-red-900{% elif alert.severity == 'medium' %}text-orange-900{% else %}text-green-900{% endif %}">{{ alert.description }}</p>
+                            <p class="text-sm {% if alert.severity == 'high' %}text-red-700{% elif alert.severity == 'medium' %}text-orange-700{% else %}text-green-700{% endif %}">{{ alert.location }} | Confidence: {{ alert.confidence }}%</p>
+                        </div>
+                        <span class="text-xs {% if alert.severity == 'high' %}text-red-600{% elif alert.severity == 'medium' %}text-orange-600{% else %}text-green-600{% endif %}" id="timestamp-{{ loop.index }}"></span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    // Update timestamps
+    {% for alert in recent_alerts %}
+    document.getElementById('timestamp-{{ loop.index }}').textContent = formatTimestamp('{{ alert.timestamp }}');
+    {% endfor %}
+</script>
+{% endblock %}
