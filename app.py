@@ -173,10 +173,12 @@ def alerts_page():
 # API Routes
 @app.route('/api/detect-frame', methods=['POST'])
 def detect_frame():
-    """Analyze a single frame for theft detection"""
+    """Analyze a single frame for theft detection with enhanced alert creation"""
     try:
         data = request.get_json()
         image_data = data.get('image')
+        camera_id = data.get('camera_id', 'live_cam')
+        location = data.get('location', 'Live Camera Feed')
         
         if not image_data:
             return jsonify({'error': 'No image data provided'}), 400
@@ -244,24 +246,30 @@ def detect_frame():
                 'fallback_reason': 'Model not loaded'
             }
         
-        # If theft detected with high confidence, add to alerts
-        if result['violence_detected'] and result['confidence'] > 70:
+        # Create detailed alert if theft detected
+        if result['violence_detected'] and result['confidence'] > 60:
+            severity = "high" if result['confidence'] > 80 else "medium" if result['confidence'] > 70 else "low"
+            
             new_alert = {
                 "id": str(uuid.uuid4()),
                 "timestamp": datetime.now().isoformat(),
                 "type": "theft",
-                "severity": "high" if result['confidence'] > 80 else "medium",
+                "severity": severity,
                 "confidence": result['confidence'],
-                "location": "Live Camera Feed",
-                "description": f"Real-time theft detection - confidence {result['confidence']}%",
+                "location": location,
+                "description": f"Live theft detection - {result['threat_level']} threat level (confidence: {result['confidence']}%)",
                 "status": "active",
                 "metadata": {
-                    "cameraId": "live_cam",
+                    "cameraId": camera_id,
                     "realtime": True,
-                    "model_used": result.get('model_used', False)
+                    "model_used": result.get('model_used', False),
+                    "threat_level": result['threat_level'],
+                    "detection_method": "live_stream"
                 }
             }
             alerts_db.append(new_alert)
+            result['alert_created'] = True
+            result['alert_id'] = new_alert['id']
         
         return jsonify(result)
         
@@ -270,7 +278,7 @@ def detect_frame():
 
 @app.route('/api/analyze-video', methods=['POST'])
 def analyze_video():
-    """Analyze uploaded video file"""
+    """Analyze uploaded video file with detailed alert creation"""
     try:
         if 'video' not in request.files:
             return jsonify({'error': 'No video file provided'}), 400
@@ -279,58 +287,82 @@ def analyze_video():
         if video_file.filename == '':
             return jsonify({'error': 'No video file selected'}), 400
         
-        # Mock video analysis - in real implementation, process the video
-        # Simulate analysis results
-        mock_results = {
-            'totalFrames': random.randint(1500, 3000),
-            'processedFrames': 0,  # Will be updated during processing
-            'detections': [
-                {
-                    'timestamp': 45.2,
-                    'confidence': 87,
-                    'detected': True,
-                    'description': 'Suspicious behavior detected - person concealing item'
-                },
-                {
-                    'timestamp': 127.8,
-                    'confidence': 72,
-                    'detected': True,
-                    'description': 'Potential theft activity - item removal without payment'
-                },
-                {
-                    'timestamp': 203.5,
-                    'confidence': 91,
-                    'detected': True,
-                    'description': 'High confidence theft detection - concealment behavior'
-                }
-            ],
-            'overallThreatLevel': 'High',
-            'averageConfidence': 83,
-            'processingTime': random.randint(30, 60)
+        # Enhanced mock video analysis with more realistic results
+        total_frames = random.randint(1500, 3000)
+        
+        # Generate realistic detection events
+        num_detections = random.randint(1, 5)
+        detections = []
+        
+        for i in range(num_detections):
+            timestamp = random.uniform(10, total_frames / 30)  # Convert frames to seconds
+            confidence = random.randint(65, 95)
+            detected = confidence > 70
+            
+            if detected:
+                descriptions = [
+                    "Suspicious behavior detected - person concealing item",
+                    "Potential theft activity - item removal without payment", 
+                    "High confidence theft detection - concealment behavior",
+                    "Unusual movement pattern suggesting shoplifting",
+                    "Person placing item in bag without scanning"
+                ]
+                description = random.choice(descriptions)
+            else:
+                description = "Low confidence detection - likely false positive"
+            
+            detections.append({
+                'timestamp': round(timestamp, 1),
+                'confidence': confidence,
+                'detected': detected,
+                'description': description
+            })
+        
+        # Sort detections by timestamp
+        detections.sort(key=lambda x: x['timestamp'])
+        
+        # Calculate overall metrics
+        valid_detections = [d for d in detections if d['detected']]
+        overall_threat = "High" if len(valid_detections) > 2 else "Medium" if len(valid_detections) > 0 else "Low"
+        avg_confidence = sum(d['confidence'] for d in valid_detections) / len(valid_detections) if valid_detections else 0
+        
+        results = {
+            'totalFrames': total_frames,
+            'processedFrames': total_frames,
+            'detections': detections,
+            'overallThreatLevel': overall_threat,
+            'averageConfidence': round(avg_confidence, 1),
+            'processingTime': random.randint(30, 120),
+            'validDetections': len(valid_detections),
+            'filename': video_file.filename
         }
         
-        mock_results['processedFrames'] = mock_results['totalFrames']
-        
-        # Add alerts for detected incidents
-        for detection in mock_results['detections']:
+        # Create alerts for high-confidence detections
+        for detection in valid_detections:
             if detection['confidence'] > 70:
+                severity = "high" if detection['confidence'] > 85 else "medium"
+                
                 new_alert = {
                     "id": str(uuid.uuid4()),
                     "timestamp": datetime.now().isoformat(),
                     "type": "theft",
-                    "severity": "high" if detection['confidence'] > 80 else "medium",
+                    "severity": severity,
                     "confidence": detection['confidence'],
-                    "location": f"Uploaded Video - {detection['timestamp']}s",
-                    "description": detection['description'],
+                    "location": f"Uploaded Video: {video_file.filename}",
+                    "description": f"{detection['description']} (at {detection['timestamp']}s)",
                     "status": "active",
                     "metadata": {
                         "videoFile": video_file.filename,
-                        "timestamp": detection['timestamp']
+                        "videoTimestamp": detection['timestamp'],
+                        "detection_method": "video_upload",
+                        "processing_time": results['processingTime']
                     }
                 }
                 alerts_db.append(new_alert)
         
-        return jsonify(mock_results)
+        results['alerts_created'] = len([d for d in valid_detections if d['confidence'] > 70])
+        
+        return jsonify(results)
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -339,15 +371,45 @@ def analyze_video():
 def get_alerts():
     """Get all alerts with optional filtering"""
     try:
+        # Get query parameters for filtering
+        status_filter = request.args.get('status', 'all')
+        type_filter = request.args.get('type', 'all')
+        severity_filter = request.args.get('severity', 'all')
+        
+        # Filter alerts based on parameters
+        filtered_alerts = alerts_db
+        
+        if status_filter != 'all':
+            filtered_alerts = [a for a in filtered_alerts if a['status'] == status_filter]
+        
+        if type_filter != 'all':
+            filtered_alerts = [a for a in filtered_alerts if a['type'] == type_filter]
+            
+        if severity_filter != 'all':
+            filtered_alerts = [a for a in filtered_alerts if a['severity'] == severity_filter]
+        
         # Sort alerts by timestamp (newest first)
-        sorted_alerts = sorted(alerts_db, key=lambda x: x['timestamp'], reverse=True)
-        return jsonify({'alerts': sorted_alerts})
+        sorted_alerts = sorted(filtered_alerts, key=lambda x: x['timestamp'], reverse=True)
+        
+        # Add statistics
+        stats = {
+            'total': len(alerts_db),
+            'active': len([a for a in alerts_db if a['status'] == 'active']),
+            'acknowledged': len([a for a in alerts_db if a['status'] == 'acknowledged']),
+            'resolved': len([a for a in alerts_db if a['status'] == 'resolved'])
+        }
+        
+        return jsonify({
+            'alerts': sorted_alerts,
+            'stats': stats,
+            'filtered_count': len(sorted_alerts)
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/alerts/<alert_id>', methods=['PUT'])
 def update_alert(alert_id):
-    """Update alert status"""
+    """Update alert status with enhanced feedback"""
     try:
         data = request.get_json()
         new_status = data.get('status')
@@ -358,8 +420,25 @@ def update_alert(alert_id):
         # Find and update alert
         for alert in alerts_db:
             if alert['id'] == alert_id:
+                old_status = alert['status']
                 alert['status'] = new_status
-                return jsonify({'success': True, 'alert': alert})
+                alert['updated_at'] = datetime.now().isoformat()
+                
+                # Add status change metadata
+                if 'status_history' not in alert:
+                    alert['status_history'] = []
+                
+                alert['status_history'].append({
+                    'from': old_status,
+                    'to': new_status,
+                    'timestamp': datetime.now().isoformat()
+                })
+                
+                return jsonify({
+                    'success': True, 
+                    'alert': alert,
+                    'message': f'Alert status changed from {old_status} to {new_status}'
+                })
         
         return jsonify({'error': 'Alert not found'}), 404
         
