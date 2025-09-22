@@ -264,63 +264,62 @@
         analyzeBtn.innerHTML = '<div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div> Analyzing...';
         progressSection.classList.remove('hidden');
         
-        // Simulate progress
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 10;
-            if (progress > 100) progress = 100;
+        try {
+            // Create FormData to send video file
+            const formData = new FormData();
+            formData.append('video', selectedFile);
             
-            progressBar.style.width = progress + '%';
-            progressText.textContent = Math.floor(progress) + '%';
+            // Start progress simulation while API processes
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 5; // Slower progress for real processing
+                if (progress > 90) progress = 90; // Don't complete until API responds
+                
+                progressBar.style.width = progress + '%';
+                progressText.textContent = Math.floor(progress) + '%';
+            }, 500);
             
-            if (progress >= 100) {
-                clearInterval(progressInterval);
-                completeAnalysis();
+            // Call the actual backend API
+            const response = await fetch('/api/analyze-video', {
+                method: 'POST',
+                body: formData
+            });
+            
+            clearInterval(progressInterval);
+            
+            if (response.ok) {
+                analysisResults = await response.json();
+                
+                // Complete progress bar
+                progressBar.style.width = '100%';
+                progressText.textContent = '100%';
+                
+                setTimeout(() => {
+                    displayResults();
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.innerHTML = '<i data-lucide="eye" class="h-4 w-4"></i> Analysis Complete';
+                    exportBtn.classList.remove('hidden');
+                    progressSection.classList.add('hidden');
+                    lucide.createIcons();
+                }, 500);
+            } else {
+                throw new Error('Analysis failed');
             }
-        }, 200);
-    }
-
-    function completeAnalysis() {
-        // Mock analysis results
-        analysisResults = {
-            totalFrames: Math.floor(Math.random() * 1500) + 1500,
-            processingTime: Math.floor(Math.random() * 30) + 30,
-            detections: [
-                {
-                    timestamp: 45.2,
-                    confidence: 87,
-                    detected: true,
-                    description: 'Suspicious behavior detected - person concealing item'
-                },
-                {
-                    timestamp: 127.8,
-                    confidence: 72,
-                    detected: true,
-                    description: 'Potential theft activity - item removal without payment'
-                },
-                {
-                    timestamp: 203.5,
-                    confidence: 91,
-                    detected: true,
-                    description: 'High confidence theft detection - concealment behavior'
-                }
-            ],
-            overallThreatLevel: 'High',
-            averageConfidence: 83
-        };
-        
-        displayResults();
-        
-        analyzeBtn.disabled = false;
-        analyzeBtn.innerHTML = '<i data-lucide="eye" class="h-4 w-4"></i> Analysis Complete';
-        exportBtn.classList.remove('hidden');
-        progressSection.classList.add('hidden');
-        
-        lucide.createIcons();
+        } catch (error) {
+            console.error('Analysis error:', error);
+            clearInterval(progressInterval);
+            
+            analyzeBtn.disabled = false;
+            analyzeBtn.innerHTML = '<i data-lucide="eye" class="h-4 w-4"></i> Start Analysis';
+            progressSection.classList.add('hidden');
+            
+            alert('Analysis failed. Please try again.');
+            lucide.createIcons();
+        }
     }
 
     function displayResults() {
-        // Update summary
+        // Update summary with real data from API
         document.getElementById('total-frames').textContent = analysisResults.totalFrames.toLocaleString();
         document.getElementById('processing-time').textContent = analysisResults.processingTime + 's';
         document.getElementById('detection-count').textContent = analysisResults.detections.length;
@@ -346,7 +345,7 @@
         threatLevelText.textContent = analysisResults.overallThreatLevel;
         headerThreatBadge.classList.remove('hidden');
         
-        // Update detections timeline
+        // Update detections timeline with real data
         const detectionsList = document.getElementById('detections-list');
         detectionsList.innerHTML = '';
         
@@ -378,6 +377,12 @@
         document.getElementById('timeline-section').classList.remove('hidden');
         
         lucide.createIcons();
+    }
+
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     }
 
     exportBtn.addEventListener('click', () => {

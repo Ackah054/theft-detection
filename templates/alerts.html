@@ -146,6 +146,7 @@
     // Load alerts on page load
     document.addEventListener('DOMContentLoaded', () => {
         fetchAlerts();
+        startAutoRefresh();
         
         // Add event listeners for filters
         searchInput.addEventListener('input', filterAlerts);
@@ -355,6 +356,13 @@
 
     async function updateAlertStatus(alertId, newStatus) {
         try {
+            // Show loading state on button
+            const buttons = document.querySelectorAll(`button[onclick*="${alertId}"]`);
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.innerHTML = '<div class="animate-spin h-3 w-3 border border-white border-t-transparent rounded-full"></div>';
+            });
+
             const response = await fetch(`/api/alerts/${alertId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -368,12 +376,47 @@
                     allAlerts[alertIndex].status = newStatus;
                     updateStats();
                     filterAlerts();
+                    
+                    // Show success feedback
+                    showNotification(`Alert ${newStatus} successfully!`, 'success');
                 }
+            } else {
+                throw new Error('Failed to update alert');
             }
         } catch (error) {
             console.error('Error updating alert:', error);
-            alert('Error updating alert status');
+            showNotification('Error updating alert status', 'error');
+            
+            // Re-enable buttons on error
+            const buttons = document.querySelectorAll(`button[onclick*="${alertId}"]`);
+            buttons.forEach(btn => {
+                btn.disabled = false;
+                btn.innerHTML = btn.textContent;
+            });
         }
+    }
+
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 ${
+            type === 'success' ? 'bg-green-600 text-white' : 
+            type === 'error' ? 'bg-red-600 text-white' : 
+            'bg-blue-600 text-white'
+        }`;
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
+    function startAutoRefresh() {
+        setInterval(() => {
+            fetchAlerts();
+        }, 30000); // Refresh every 30 seconds
     }
 </script>
 {% endblock %}
