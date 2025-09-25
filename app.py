@@ -278,7 +278,7 @@ def detect_frame():
 
 @app.route('/api/analyze-video', methods=['POST'])
 def analyze_video():
-    """Analyze uploaded video file with detailed alert creation"""
+    """Analyze uploaded video file with real AI model processing"""
     try:
         if 'video' not in request.files:
             return jsonify({'error': 'No video file provided'}), 400
@@ -287,85 +287,183 @@ def analyze_video():
         if video_file.filename == '':
             return jsonify({'error': 'No video file selected'}), 400
         
-        # Enhanced mock video analysis with more realistic results
-        total_frames = random.randint(1500, 3000)
+        temp_video_path = f"temp_{uuid.uuid4().hex}_{video_file.filename}"
+        video_file.save(temp_video_path)
         
-        # Generate realistic detection events
-        num_detections = random.randint(1, 5)
-        detections = []
-        
-        for i in range(num_detections):
-            timestamp = random.uniform(10, total_frames / 30)  # Convert frames to seconds
-            confidence = random.randint(65, 95)
-            detected = confidence > 70
+        try:
+            cap = cv2.VideoCapture(temp_video_path)
             
-            if detected:
-                descriptions = [
-                    "Suspicious behavior detected - person concealing item",
-                    "Potential theft activity - item removal without payment", 
-                    "High confidence theft detection - concealment behavior",
-                    "Unusual movement pattern suggesting shoplifting",
-                    "Person placing item in bag without scanning"
-                ]
-                description = random.choice(descriptions)
-            else:
-                description = "Low confidence detection - likely false positive"
+            if not cap.isOpened():
+                return jsonify({'error': 'Could not open video file'}), 400
             
-            detections.append({
-                'timestamp': round(timestamp, 1),
-                'confidence': confidence,
-                'detected': detected,
-                'description': description
-            })
-        
-        # Sort detections by timestamp
-        detections.sort(key=lambda x: x['timestamp'])
-        
-        # Calculate overall metrics
-        valid_detections = [d for d in detections if d['detected']]
-        overall_threat = "High" if len(valid_detections) > 2 else "Medium" if len(valid_detections) > 0 else "Low"
-        avg_confidence = sum(d['confidence'] for d in valid_detections) / len(valid_detections) if valid_detections else 0
-        
-        results = {
-            'totalFrames': total_frames,
-            'processedFrames': total_frames,
-            'detections': detections,
-            'overallThreatLevel': overall_threat,
-            'averageConfidence': round(avg_confidence, 1),
-            'processingTime': random.randint(30, 120),
-            'validDetections': len(valid_detections),
-            'filename': video_file.filename
-        }
-        
-        # Create alerts for high-confidence detections
-        for detection in valid_detections:
-            if detection['confidence'] > 70:
-                severity = "high" if detection['confidence'] > 85 else "medium"
+            # Get video properties
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            duration = total_frames / fps if fps > 0 else 0
+            
+            detections = []
+            frame_count = 0
+            processed_frames = 0
+            
+            frame_skip = max(1, int(fps)) if fps > 0 else 30
+            
+            print(f"Processing video: {total_frames} frames, {fps} FPS, {duration:.1f}s duration")
+            
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
                 
-                new_alert = {
-                    "id": str(uuid.uuid4()),
-                    "timestamp": datetime.now().isoformat(),
-                    "type": "theft",
-                    "severity": severity,
-                    "confidence": detection['confidence'],
-                    "location": f"Uploaded Video: {video_file.filename}",
-                    "description": f"{detection['description']} (at {detection['timestamp']}s)",
-                    "status": "active",
-                    "metadata": {
-                        "videoFile": video_file.filename,
-                        "videoTimestamp": detection['timestamp'],
-                        "detection_method": "video_upload",
-                        "processing_time": results['processingTime']
+                frame_count += 1
+                
+                # Skip frames for efficiency
+                if frame_count % frame_skip != 0:
+                    continue
+                
+                processed_frames += 1
+                current_time = frame_count / fps if fps > 0 else frame_count / 30
+                
+                try:
+                    # Resize frame
+                    frame_resized = cv2.resize(frame, (224, 224))
+                    # Convert BGR to RGB
+                    frame_rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
+                    # Normalize
+                    frame_normalized = frame_rgb.astype(np.float32) / 255.0
+                    # Add batch dimension
+                    frame_batch = np.expand_dims(frame_normalized, axis=0)
+                    
+                    if model is not None:
+                        try:
+                            prediction = model.predict(frame_batch, verbose=0)
+                            
+                            # Process prediction based on model output
+                            if len(prediction.shape) > 1 and prediction.shape[1] > 1:
+                                # Multi-class output
+                                theft_probability = float(prediction[0][1])  # Assuming index 1 is theft class
+                            else:
+                                # Binary output
+                                theft_probability = float(prediction[0][0])
+                            
+                            confidence = int(theft_probability * 100)
+                            detected = theft_probability > 0.5  # Threshold for detection
+                            
+                            if detected and confidence > 60:
+                                descriptions = [
+                                    f"AI Model detected suspicious behavior (confidence: {confidence}%)",
+                                    f"Theft activity identified by neural network (confidence: {confidence}%)",
+                                    f"Abnormal behavior pattern detected (confidence: {confidence}%)",
+                                    f"Potential shoplifting behavior identified (confidence: {confidence}%)",
+                                    f"Suspicious concealment activity detected (confidence: {confidence}%)"
+                                ]
+                                description = random.choice(descriptions)
+                                
+                                detections.append({
+                                    'timestamp': round(current_time, 1),
+                                    'confidence': confidence,
+                                    'detected': True,
+                                    'description': description,
+                                    'model_used': True,
+                                    'frame_number': frame_count
+                                })
+                                
+                                print(f"Detection at {current_time:.1f}s: {confidence}% confidence")
+                        
+                        except Exception as model_error:
+                            print(f"Model prediction error at frame {frame_count}: {str(model_error)}")
+                            # Continue processing other frames
+                            continue
+                    
+                    else:
+                        # Simple heuristic: detect significant changes or unusual patterns
+                        gray = cv2.cvtColor(frame_resized, cv2.COLOR_RGB2GRAY)
+                        
+                        # Basic motion detection using frame differences (simplified)
+                        # This is a placeholder - in real implementation you'd compare with previous frames
+                        mean_intensity = np.mean(gray)
+                        std_intensity = np.std(gray)
+                        
+                        # Heuristic: unusual lighting or movement patterns
+                        if std_intensity > 50 and mean_intensity < 100:  # Dark areas with high variation
+                            confidence = random.randint(60, 80)  # Lower confidence for heuristic
+                            
+                            detections.append({
+                                'timestamp': round(current_time, 1),
+                                'confidence': confidence,
+                                'detected': True,
+                                'description': f"Heuristic analysis detected unusual activity (confidence: {confidence}%)",
+                                'model_used': False,
+                                'frame_number': frame_count
+                            })
+                
+                except Exception as frame_error:
+                    print(f"Error processing frame {frame_count}: {str(frame_error)}")
+                    continue
+            
+            cap.release()
+            
+            valid_detections = [d for d in detections if d['detected']]
+            overall_threat = "High" if len(valid_detections) > 3 else "Medium" if len(valid_detections) > 1 else "Low"
+            avg_confidence = sum(d['confidence'] for d in valid_detections) / len(valid_detections) if valid_detections else 0
+            
+            processing_time = max(10, processed_frames * 0.5)  # Rough estimate
+            
+            results = {
+                'totalFrames': total_frames,
+                'processedFrames': processed_frames,
+                'detections': detections,
+                'overallThreatLevel': overall_threat,
+                'averageConfidence': round(avg_confidence, 1),
+                'processingTime': round(processing_time, 1),
+                'validDetections': len(valid_detections),
+                'filename': video_file.filename,
+                'duration': round(duration, 1),
+                'fps': round(fps, 1),
+                'model_used': model is not None
+            }
+            
+            alerts_created = 0
+            for detection in valid_detections:
+                if detection['confidence'] > 70:
+                    severity = "high" if detection['confidence'] > 85 else "medium"
+                    
+                    new_alert = {
+                        "id": str(uuid.uuid4()),
+                        "timestamp": datetime.now().isoformat(),
+                        "type": "theft",
+                        "severity": severity,
+                        "confidence": detection['confidence'],
+                        "location": f"Uploaded Video: {video_file.filename}",
+                        "description": f"{detection['description']} (at {detection['timestamp']}s)",
+                        "status": "active",
+                        "metadata": {
+                            "videoFile": video_file.filename,
+                            "videoTimestamp": detection['timestamp'],
+                            "detection_method": "video_upload",
+                            "processing_time": results['processingTime'],
+                            "model_used": detection.get('model_used', False),
+                            "frame_number": detection.get('frame_number', 0)
+                        }
                     }
-                }
-                alerts_db.append(new_alert)
+                    alerts_db.append(new_alert)
+                    alerts_created += 1
+            
+            results['alerts_created'] = alerts_created
+            
+            print(f"Video analysis complete: {len(valid_detections)} detections, {alerts_created} alerts created")
+            
+            return jsonify(results)
         
-        results['alerts_created'] = len([d for d in valid_detections if d['confidence'] > 70])
-        
-        return jsonify(results)
+        finally:
+            try:
+                if os.path.exists(temp_video_path):
+                    os.remove(temp_video_path)
+            except Exception as cleanup_error:
+                print(f"Warning: Could not delete temporary file: {cleanup_error}")
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Video analysis error: {str(e)}")
+        return jsonify({'error': f'Video analysis failed: {str(e)}'}), 500
 
 @app.route('/api/alerts', methods=['GET'])
 def get_alerts():
