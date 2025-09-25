@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 
 interface DetectionRequest {
   image: string // Base64 encoded image
+  camera_id?: string
+  location?: string
 }
 
 interface DetectionResponse {
@@ -9,26 +11,10 @@ interface DetectionResponse {
   confidence: number
   threat_level: "Low" | "Medium" | "High"
   timestamp: string
+  model_used?: boolean
+  alert_created?: boolean
+  alert_id?: string
   error?: string
-}
-
-// Simulate AI model detection logic
-function simulateTheftDetection(): DetectionResponse {
-  // Generate random detection results for demo purposes
-  // In a real implementation, this would call your actual AI model
-  const randomConfidence = Math.floor(Math.random() * 100)
-  const isTheftDetected = randomConfidence > 65 // 35% chance of detection
-
-  let threatLevel: "Low" | "Medium" | "High" = "Low"
-  if (randomConfidence > 85) threatLevel = "High"
-  else if (randomConfidence > 70) threatLevel = "Medium"
-
-  return {
-    violence_detected: isTheftDetected,
-    confidence: randomConfidence,
-    threat_level: threatLevel,
-    timestamp: new Date().toISOString(),
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -44,22 +30,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid image format" }, { status: 400 })
     }
 
-    // Simulate processing delay (remove in production)
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    const flaskResponse = await fetch("http://localhost:5000/api/detect-frame", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        image: body.image,
+        camera_id: body.camera_id || "live_cam",
+        location: body.location || "Live Camera Feed",
+      }),
+    })
 
-    // In a real implementation, you would:
-    // 1. Decode the base64 image
-    // 2. Preprocess the image for your AI model
-    // 3. Run inference using your trained theft detection model
-    // 4. Post-process the results
+    if (!flaskResponse.ok) {
+      throw new Error(`Flask backend error: ${flaskResponse.statusText}`)
+    }
 
-    // For now, we'll simulate the detection
-    const detectionResult = simulateTheftDetection()
-
+    const detectionResult = await flaskResponse.json()
     return NextResponse.json(detectionResult)
   } catch (error) {
     console.error("Detection API error:", error)
-    return NextResponse.json({ error: "Internal server error during detection" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Failed to connect to AI detection backend. Please ensure the Flask server is running.",
+      },
+      { status: 500 },
+    )
   }
 }
 

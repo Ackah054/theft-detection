@@ -70,47 +70,63 @@ export default function VideoUpload() {
     setIsAnalyzing(true)
     setAnalysisProgress(0)
 
-    // Simulate video analysis with progress updates
-    const totalSteps = 100
-    const interval = setInterval(() => {
-      setAnalysisProgress((prev) => {
-        if (prev >= totalSteps) {
-          clearInterval(interval)
-          // Simulate analysis results
-          const mockResults: VideoAnalysis = {
-            totalFrames: 1800,
-            processedFrames: 1800,
-            detections: [
-              {
-                timestamp: 45.2,
-                confidence: 87,
-                detected: true,
-                description: "Suspicious behavior detected - person concealing item",
-              },
-              {
-                timestamp: 127.8,
-                confidence: 72,
-                detected: true,
-                description: "Potential theft activity - item removal without payment",
-              },
-              {
-                timestamp: 203.5,
-                confidence: 91,
-                detected: true,
-                description: "High confidence theft detection - concealment behavior",
-              },
-            ],
-            overallThreatLevel: "High",
-            averageConfidence: 83,
-            processingTime: 45,
-          }
-          setAnalysisResults(mockResults)
-          setIsAnalyzing(false)
-          return totalSteps
-        }
-        return prev + 1
+    try {
+      const formData = new FormData()
+      formData.append("video", selectedFile)
+
+      // Start analysis with real backend
+      const response = await fetch("/api/analyze-video", {
+        method: "POST",
+        body: formData,
       })
-    }, 50)
+
+      if (!response.ok) {
+        throw new Error(`Analysis failed: ${response.statusText}`)
+      }
+
+      // Simulate progress updates while waiting for real results
+      const progressInterval = setInterval(() => {
+        setAnalysisProgress((prev) => {
+          if (prev >= 95) {
+            clearInterval(progressInterval)
+            return 95 // Stop at 95% until we get real results
+          }
+          return prev + Math.random() * 5
+        })
+      }, 200)
+
+      const analysisResults = await response.json()
+
+      clearInterval(progressInterval)
+      setAnalysisProgress(100)
+
+      if (analysisResults.error) {
+        throw new Error(analysisResults.error)
+      }
+
+      const realResults: VideoAnalysis = {
+        totalFrames: analysisResults.results?.totalFrames || 0,
+        processedFrames: analysisResults.results?.processedFrames || 0,
+        detections:
+          analysisResults.results?.detections?.map((d: any) => ({
+            timestamp: d.timestamp,
+            confidence: d.confidence,
+            detected: d.detected,
+            description: d.description,
+          })) || [],
+        overallThreatLevel: analysisResults.results?.overallThreatLevel || "Low",
+        averageConfidence: analysisResults.results?.averageConfidence || 0,
+        processingTime: analysisResults.results?.processingTime || 0,
+      }
+
+      setAnalysisResults(realResults)
+      setIsAnalyzing(false)
+    } catch (error) {
+      console.error("Analysis failed:", error)
+      setIsAnalyzing(false)
+      setAnalysisProgress(0)
+      alert(`Analysis failed: ${error instanceof Error ? error.message : "Unknown error"}`)
+    }
   }
 
   const togglePlayPause = () => {

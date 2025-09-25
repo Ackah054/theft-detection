@@ -46,125 +46,96 @@ interface VideoAnalysisResponse {
   error?: string
 }
 
-// Simulate video analysis processing
-function simulateVideoAnalysis(options?: VideoAnalysisRequest["analysisOptions"]): VideoAnalysisResponse["results"] {
-  const totalFrames = Math.floor(Math.random() * 3000) + 1000 // 1000-4000 frames
-  const processingTime = Math.floor(Math.random() * 60) + 30 // 30-90 seconds
-
-  // Generate random detections
-  const detections: DetectionEvent[] = []
-  const numDetections = Math.floor(Math.random() * 8) + 2 // 2-10 detections
-
-  for (let i = 0; i < numDetections; i++) {
-    const timestamp = Math.random() * 300 // Random timestamp within 5 minutes
-    const confidence = Math.floor(Math.random() * 40) + 60 // 60-100% confidence
-
-    const descriptions = [
-      "Suspicious behavior detected - person concealing item",
-      "Potential theft activity - item removal without payment",
-      "Unusual movement pattern detected",
-      "Person lingering in restricted area",
-      "Concealment behavior observed",
-      "Suspicious interaction with merchandise",
-      "Abnormal shopping pattern detected",
-      "Potential shoplifting behavior",
-    ]
-
-    detections.push({
-      timestamp,
-      confidence,
-      detected: true,
-      description: descriptions[Math.floor(Math.random() * descriptions.length)],
-      boundingBox: {
-        x: Math.floor(Math.random() * 800),
-        y: Math.floor(Math.random() * 600),
-        width: Math.floor(Math.random() * 200) + 100,
-        height: Math.floor(Math.random() * 300) + 150,
-      },
-    })
-  }
-
-  // Sort detections by timestamp
-  detections.sort((a, b) => a.timestamp - b.timestamp)
-
-  const averageConfidence = Math.floor(detections.reduce((sum, d) => sum + d.confidence, 0) / detections.length)
-
-  let overallThreatLevel: "Low" | "Medium" | "High" = "Low"
-  if (averageConfidence > 85) overallThreatLevel = "High"
-  else if (averageConfidence > 70) overallThreatLevel = "Medium"
-
-  const highConfidenceDetections = detections.filter((d) => d.confidence > 80).length
-
-  // Generate time ranges
-  const timeRanges = detections.reduce(
-    (ranges, detection, index) => {
-      if (index === 0 || detection.timestamp - detections[index - 1].timestamp > 30) {
-        // Start new range if this is first detection or gap > 30 seconds
-        ranges.push({
-          start: detection.timestamp,
-          end: detection.timestamp + 10,
-          severity: detection.confidence > 85 ? "High" : detection.confidence > 70 ? "Medium" : "Low",
-        })
-      } else {
-        // Extend current range
-        ranges[ranges.length - 1].end = detection.timestamp + 10
-      }
-      return ranges
-    },
-    [] as Array<{ start: number; end: number; severity: "Low" | "Medium" | "High" }>,
-  )
-
-  return {
-    totalFrames,
-    processedFrames: totalFrames,
-    detections,
-    overallThreatLevel,
-    averageConfidence,
-    processingTime,
-    summary: {
-      totalDetections: detections.length,
-      highConfidenceDetections,
-      timeRanges,
-    },
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const body: VideoAnalysisRequest = await request.json()
+    const formData = await request.formData()
+    const videoFile = formData.get("video") as File
 
-    if (!body.videoFile) {
+    if (!videoFile) {
       return NextResponse.json({ error: "No video file provided" }, { status: 400 })
     }
+
+    const flaskFormData = new FormData()
+    flaskFormData.append("video", videoFile)
+
+    const flaskResponse = await fetch("http://localhost:5000/api/analyze-video", {
+      method: "POST",
+      body: flaskFormData,
+    })
+
+    if (!flaskResponse.ok) {
+      throw new Error(`Flask backend error: ${flaskResponse.statusText}`)
+    }
+
+    const flaskResults = await flaskResponse.json()
 
     // Generate unique analysis ID
     const analysisId = `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    // Simulate processing delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    const detections: DetectionEvent[] =
+      flaskResults.detections?.map((detection: any) => ({
+        timestamp: detection.timestamp,
+        confidence: detection.confidence,
+        detected: detection.detected,
+        description: detection.description,
+        boundingBox: {
+          x: Math.floor(Math.random() * 800), // Flask doesn't provide bounding boxes yet
+          y: Math.floor(Math.random() * 600),
+          width: Math.floor(Math.random() * 200) + 100,
+          height: Math.floor(Math.random() * 300) + 150,
+        },
+      })) || []
 
-    // In a real implementation, you would:
-    // 1. Save the video file to storage
-    // 2. Extract frames at specified intervals
-    // 3. Run each frame through your AI model
-    // 4. Aggregate results and generate summary
-    // 5. Store results in database
-    // 6. Return analysis ID for status checking
+    const validDetections = detections.filter((d) => d.detected)
+    const highConfidenceDetections = validDetections.filter((d) => d.confidence > 80)
 
-    // For demo purposes, return completed analysis immediately
-    const results = simulateVideoAnalysis(body.analysisOptions)
+    // Generate time ranges from real detections
+    const timeRanges = validDetections.reduce(
+      (ranges, detection, index) => {
+        if (index === 0 || detection.timestamp - validDetections[index - 1].timestamp > 30) {
+          // Start new range if this is first detection or gap > 30 seconds
+          ranges.push({
+            start: detection.timestamp,
+            end: detection.timestamp + 10,
+            severity: detection.confidence > 85 ? "High" : detection.confidence > 70 ? "Medium" : "Low",
+          })
+        } else {
+          // Extend current range
+          ranges[ranges.length - 1].end = detection.timestamp + 10
+        }
+        return ranges
+      },
+      [] as Array<{ start: number; end: number; severity: "Low" | "Medium" | "High" }>,
+    )
 
     const response: VideoAnalysisResponse = {
       analysisId,
       status: "completed",
       progress: 100,
-      results,
+      results: {
+        totalFrames: flaskResults.totalFrames || 0,
+        processedFrames: flaskResults.processedFrames || 0,
+        detections,
+        overallThreatLevel: flaskResults.overallThreatLevel || "Low",
+        averageConfidence: flaskResults.averageConfidence || 0,
+        processingTime: flaskResults.processingTime || 0,
+        summary: {
+          totalDetections: validDetections.length,
+          highConfidenceDetections: highConfidenceDetections.length,
+          timeRanges,
+        },
+      },
     }
 
     return NextResponse.json(response)
   } catch (error) {
     console.error("Video analysis API error:", error)
-    return NextResponse.json({ error: "Internal server error during video analysis" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Failed to connect to AI analysis backend. Please ensure the Flask server is running.",
+      },
+      { status: 500 },
+    )
   }
 }
 
@@ -177,12 +148,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Analysis ID required" }, { status: 400 })
   }
 
-  // In a real implementation, you would fetch from database
-  // For demo, return mock status
-  return NextResponse.json({
-    analysisId,
-    status: "completed",
-    progress: 100,
-    message: "Analysis completed successfully",
-  })
+  try {
+    const flaskResponse = await fetch(`http://localhost:5000/api/analysis-status?id=${analysisId}`)
+
+    if (!flaskResponse.ok) {
+      return NextResponse.json({
+        analysisId,
+        status: "failed",
+        error: "Backend analysis service unavailable",
+      })
+    }
+
+    const status = await flaskResponse.json()
+    return NextResponse.json(status)
+  } catch (error) {
+    return NextResponse.json({
+      analysisId,
+      status: "failed",
+      error: "Could not connect to analysis backend",
+    })
+  }
 }

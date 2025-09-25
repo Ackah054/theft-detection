@@ -35,91 +35,53 @@ interface UpdateAlertRequest {
   status: Alert["status"]
 }
 
-// Mock alert storage (in production, use a database)
-const mockAlerts: Alert[] = [
-  {
-    id: "alert_001",
-    timestamp: new Date(Date.now() - 2 * 60 * 1000).toISOString(), // 2 minutes ago
-    type: "theft",
-    severity: "high",
-    confidence: 87,
-    location: "Camera 2 - Aisle 3",
-    description: "Suspicious behavior detected - person concealing item",
-    status: "active",
-    metadata: {
-      cameraId: "cam_002",
-      boundingBox: { x: 150, y: 200, width: 120, height: 180 },
-    },
-  },
-  {
-    id: "alert_002",
-    timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // 15 minutes ago
-    type: "suspicious",
-    severity: "medium",
-    confidence: 72,
-    location: "Camera 1 - Entrance",
-    description: "Potential theft activity - item removal without payment",
-    status: "acknowledged",
-    metadata: {
-      cameraId: "cam_001",
-      boundingBox: { x: 300, y: 150, width: 100, height: 160 },
-    },
-  },
-  {
-    id: "alert_003",
-    timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(), // 1 hour ago
-    type: "system",
-    severity: "low",
-    confidence: 100,
-    location: "System",
-    description: "All cameras operational - Model updated",
-    status: "resolved",
-    metadata: {},
-  },
-]
-
-// GET /api/alerts - Fetch all alerts with optional filtering
+// GET /api/alerts - Fetch all alerts from Flask backend
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
     const type = searchParams.get("type")
     const severity = searchParams.get("severity")
-    const limit = Number.parseInt(searchParams.get("limit") || "50")
-    const offset = Number.parseInt(searchParams.get("offset") || "0")
+    const limit = searchParams.get("limit") || "50"
+    const offset = searchParams.get("offset") || "0"
 
-    let filteredAlerts = [...mockAlerts]
+    const flaskUrl = new URL("http://localhost:5000/api/alerts")
+    if (status) flaskUrl.searchParams.set("status", status)
+    if (type) flaskUrl.searchParams.set("type", type)
+    if (severity) flaskUrl.searchParams.set("severity", severity)
+    flaskUrl.searchParams.set("limit", limit)
+    flaskUrl.searchParams.set("offset", offset)
 
-    // Apply filters
-    if (status) {
-      filteredAlerts = filteredAlerts.filter((alert) => alert.status === status)
+    const flaskResponse = await fetch(flaskUrl.toString())
+
+    if (!flaskResponse.ok) {
+      throw new Error(`Flask backend error: ${flaskResponse.statusText}`)
     }
-    if (type) {
-      filteredAlerts = filteredAlerts.filter((alert) => alert.type === type)
-    }
-    if (severity) {
-      filteredAlerts = filteredAlerts.filter((alert) => alert.severity === severity)
-    }
 
-    // Sort by timestamp (newest first)
-    filteredAlerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-
-    // Apply pagination
-    const paginatedAlerts = filteredAlerts.slice(offset, offset + limit)
+    const alertsData = await flaskResponse.json()
 
     return NextResponse.json({
-      alerts: paginatedAlerts,
-      total: filteredAlerts.length,
-      offset,
-      limit,
+      alerts: alertsData.alerts || [],
+      total: alertsData.total || 0,
+      offset: Number.parseInt(offset),
+      limit: Number.parseInt(limit),
     })
   } catch (error) {
     console.error("Get alerts API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Failed to fetch alerts from backend. Please ensure the Flask server is running.",
+        alerts: [],
+        total: 0,
+        offset: 0,
+        limit: 50,
+      },
+      { status: 500 },
+    )
   }
 }
 
-// POST /api/alerts - Create new alert
+// POST /api/alerts - Create new alert via Flask backend
 export async function POST(request: NextRequest) {
   try {
     const body: CreateAlertRequest = await request.json()
@@ -131,28 +93,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const newAlert: Alert = {
-      id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date().toISOString(),
-      type: body.type,
-      severity: body.severity,
-      confidence: body.confidence || 0,
-      location: body.location,
-      description: body.description,
-      status: "active",
-      metadata: body.metadata || {},
+    const flaskResponse = await fetch("http://localhost:5000/api/alerts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    })
+
+    if (!flaskResponse.ok) {
+      throw new Error(`Flask backend error: ${flaskResponse.statusText}`)
     }
 
-    mockAlerts.unshift(newAlert) // Add to beginning of array
-
+    const newAlert = await flaskResponse.json()
     return NextResponse.json(newAlert, { status: 201 })
   } catch (error) {
     console.error("Create alert API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Failed to create alert. Please ensure the Flask server is running.",
+      },
+      { status: 500 },
+    )
   }
 }
 
-// PUT /api/alerts/[id] - Update alert status
+// PUT /api/alerts/[id] - Update alert status via Flask backend
 export async function PUT(request: NextRequest) {
   try {
     const url = new URL(request.url)
@@ -168,17 +134,27 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Status field required" }, { status: 400 })
     }
 
-    const alertIndex = mockAlerts.findIndex((alert) => alert.id === alertId)
+    const flaskResponse = await fetch(`http://localhost:5000/api/alerts/${alertId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    })
 
-    if (alertIndex === -1) {
-      return NextResponse.json({ error: "Alert not found" }, { status: 404 })
+    if (!flaskResponse.ok) {
+      throw new Error(`Flask backend error: ${flaskResponse.statusText}`)
     }
 
-    mockAlerts[alertIndex].status = body.status
-
-    return NextResponse.json(mockAlerts[alertIndex])
+    const updatedAlert = await flaskResponse.json()
+    return NextResponse.json(updatedAlert)
   } catch (error) {
     console.error("Update alert API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Failed to update alert. Please ensure the Flask server is running.",
+      },
+      { status: 500 },
+    )
   }
 }

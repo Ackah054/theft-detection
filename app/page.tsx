@@ -1,19 +1,103 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Camera, Upload, Shield, AlertTriangle, Activity, Eye } from "lucide-react"
 import Link from "next/link"
 
+interface DashboardStats {
+  totalCameras: number
+  activeCameras: number
+  alertsToday: number
+  detectionAccuracy: number
+}
+
+interface RecentAlert {
+  id: string
+  timestamp: string
+  type: string
+  severity: string
+  confidence: number
+  location: string
+  description: string
+  status: string
+}
+
 export default function Dashboard() {
-  const [stats] = useState({
-    totalCameras: 4,
-    activeCameras: 3,
-    alertsToday: 2,
-    detectionAccuracy: 94.2,
+  const [stats, setStats] = useState<DashboardStats>({
+    totalCameras: 0,
+    activeCameras: 0,
+    alertsToday: 0,
+    detectionAccuracy: 0,
   })
+  const [recentAlerts, setRecentAlerts] = useState<RecentAlert[]>([])
+  const [loading, setLoading] = useState(true)
+  const [backendConnected, setBackendConnected] = useState(false)
+
+  useEffect(() => {
+    fetchDashboardData()
+    // Refresh data every 30 seconds
+    const interval = setInterval(fetchDashboardData, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      const [statsResponse, alertsResponse] = await Promise.all([
+        fetch("http://localhost:5000/api/dashboard-stats"),
+        fetch("/api/alerts?limit=3&status=active"),
+      ])
+
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json()
+        setStats(statsData)
+        setBackendConnected(true)
+      } else {
+        // Fallback when backend is not available
+        console.warn("Backend not available, using fallback data")
+        setStats({
+          totalCameras: 4,
+          activeCameras: 0, // Show 0 when backend is down
+          alertsToday: 0,
+          detectionAccuracy: 0,
+        })
+        setBackendConnected(false)
+      }
+
+      if (alertsResponse.ok) {
+        const alertsData = await alertsResponse.json()
+        setRecentAlerts(alertsData.alerts || [])
+      }
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error)
+      setBackendConnected(false)
+      // Show system offline state
+      setStats({
+        totalCameras: 4,
+        activeCameras: 0,
+        alertsToday: 0,
+        detectionAccuracy: 0,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatTimeAgo = (timestamp: string) => {
+    const now = new Date()
+    const alertTime = new Date(timestamp)
+    const diffMs = now.getTime() - alertTime.getTime()
+    const diffMins = Math.floor(diffMs / (1000 * 60))
+
+    if (diffMins < 1) return "Just now"
+    if (diffMins < 60) return `${diffMins} min ago`
+    const diffHours = Math.floor(diffMins / 60)
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`
+    const diffDays = Math.floor(diffHours / 24)
+    return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -28,9 +112,12 @@ export default function Dashboard() {
                 <p className="text-sm text-muted-foreground">Advanced Theft Detection System</p>
               </div>
             </div>
-            <Badge variant="outline" className="text-green-600 border-green-600">
+            <Badge
+              variant="outline"
+              className={backendConnected ? "text-green-600 border-green-600" : "text-red-600 border-red-600"}
+            >
               <Activity className="h-3 w-3 mr-1" />
-              System Active
+              {backendConnected ? "System Active" : "System Offline"}
             </Badge>
           </div>
         </div>
@@ -46,7 +133,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {stats.activeCameras}/{stats.totalCameras}
+                {loading ? "..." : `${stats.activeCameras}/${stats.totalCameras}`}
               </div>
               <p className="text-xs text-muted-foreground">Monitoring live feeds</p>
             </CardContent>
@@ -58,7 +145,7 @@ export default function Dashboard() {
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{stats.alertsToday}</div>
+              <div className="text-2xl font-bold text-orange-600">{loading ? "..." : stats.alertsToday}</div>
               <p className="text-xs text-muted-foreground">Suspicious activities detected</p>
             </CardContent>
           </Card>
@@ -69,7 +156,7 @@ export default function Dashboard() {
               <Eye className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.detectionAccuracy}%</div>
+              <div className="text-2xl font-bold text-green-600">{loading ? "..." : `${stats.detectionAccuracy}%`}</div>
               <p className="text-xs text-muted-foreground">AI model performance</p>
             </CardContent>
           </Card>
@@ -80,8 +167,12 @@ export default function Dashboard() {
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">Online</div>
-              <p className="text-xs text-muted-foreground">All systems operational</p>
+              <div className={`text-2xl font-bold ${backendConnected ? "text-green-600" : "text-red-600"}`}>
+                {loading ? "..." : backendConnected ? "Online" : "Offline"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {backendConnected ? "All systems operational" : "Backend disconnected"}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -201,32 +292,71 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center gap-4 p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-                <div className="flex-1">
-                  <p className="font-medium text-red-900 dark:text-red-100">Suspicious Activity Detected</p>
-                  <p className="text-sm text-red-700 dark:text-red-300">Camera 2 - Aisle 3 | Confidence: 87%</p>
+              {loading ? (
+                <div className="text-center py-4 text-muted-foreground">Loading recent activity...</div>
+              ) : recentAlerts.length > 0 ? (
+                recentAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className={`flex items-center gap-4 p-3 rounded-lg border ${
+                      alert.severity === "high"
+                        ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
+                        : alert.severity === "medium"
+                          ? "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
+                          : "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800"
+                    }`}
+                  >
+                    <AlertTriangle
+                      className={`h-5 w-5 ${
+                        alert.severity === "high"
+                          ? "text-red-600"
+                          : alert.severity === "medium"
+                            ? "text-orange-600"
+                            : "text-yellow-600"
+                      }`}
+                    />
+                    <div className="flex-1">
+                      <p
+                        className={`font-medium ${
+                          alert.severity === "high"
+                            ? "text-red-900 dark:text-red-100"
+                            : alert.severity === "medium"
+                              ? "text-orange-900 dark:text-orange-100"
+                              : "text-yellow-900 dark:text-yellow-100"
+                        }`}
+                      >
+                        {alert.description}
+                      </p>
+                      <p
+                        className={`text-sm ${
+                          alert.severity === "high"
+                            ? "text-red-700 dark:text-red-300"
+                            : alert.severity === "medium"
+                              ? "text-orange-700 dark:text-orange-300"
+                              : "text-yellow-700 dark:text-yellow-300"
+                        }`}
+                      >
+                        {alert.location} | Confidence: {alert.confidence}%
+                      </p>
+                    </div>
+                    <span
+                      className={`text-xs ${
+                        alert.severity === "high"
+                          ? "text-red-600"
+                          : alert.severity === "medium"
+                            ? "text-orange-600"
+                            : "text-yellow-600"
+                      }`}
+                    >
+                      {formatTimeAgo(alert.timestamp)}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  {backendConnected ? "No recent alerts" : "Connect to backend to view recent activity"}
                 </div>
-                <span className="text-xs text-red-600">2 min ago</span>
-              </div>
-
-              <div className="flex items-center gap-4 p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
-                <AlertTriangle className="h-5 w-5 text-orange-600" />
-                <div className="flex-1">
-                  <p className="font-medium text-orange-900 dark:text-orange-100">Potential Theft Alert</p>
-                  <p className="text-sm text-orange-700 dark:text-orange-300">Camera 1 - Entrance | Confidence: 72%</p>
-                </div>
-                <span className="text-xs text-orange-600">15 min ago</span>
-              </div>
-
-              <div className="flex items-center gap-4 p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
-                <Activity className="h-5 w-5 text-green-600" />
-                <div className="flex-1">
-                  <p className="font-medium text-green-900 dark:text-green-100">System Health Check</p>
-                  <p className="text-sm text-green-700 dark:text-green-300">All cameras operational - Model updated</p>
-                </div>
-                <span className="text-xs text-green-600">1 hour ago</span>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>
