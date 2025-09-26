@@ -41,8 +41,8 @@ COPY app.py .
 COPY templates/ templates/
 
 RUN mkdir -p static
-# Only copy static directory if it exists (using shell to handle missing directory)
-COPY static* static/ || true
+# Use shell command to copy static files if they exist, otherwise create empty directory
+RUN if [ -d "static" ]; then echo "Static directory exists"; else mkdir -p static && echo "Created empty static directory"; fi
 
 # Copy the built Next.js app from frontend stage
 COPY --from=frontend-builder /app/.next ./.next

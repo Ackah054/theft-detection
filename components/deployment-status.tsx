@@ -17,22 +17,35 @@ export function DeploymentStatus() {
   useEffect(() => {
     const checkBackendStatus = async () => {
       try {
-        const response = await fetch("/api/dashboard-stats")
-        const data = await response.json()
+        const response = await fetch("/api/dashboard-stats").catch((err) => {
+          console.log("[v0] Backend status check failed:", err.message)
+          return null
+        })
 
-        if (data.error && data.error.includes("Backend unavailable")) {
-          setStatus({
-            connected: false,
-            url: "localhost:5000 (fallback)",
-            error: data.error,
-          })
+        if (response && response.ok) {
+          const data = await response.json()
+
+          if (data.error && data.error.includes("Backend unavailable")) {
+            setStatus({
+              connected: false,
+              url: "localhost:5000 (fallback)",
+              error: data.error,
+            })
+          } else {
+            setStatus({
+              connected: true,
+              url: "Flask backend connected",
+            })
+          }
         } else {
           setStatus({
-            connected: true,
-            url: "Flask backend connected",
+            connected: false,
+            url: "API unavailable",
+            error: "Could not reach dashboard API",
           })
         }
       } catch (error) {
+        console.log("[v0] Backend status check error:", error)
         setStatus({
           connected: false,
           url: "Unknown",

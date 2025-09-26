@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Camera, Upload, Shield, AlertTriangle, Activity, Eye } from "lucide-react"
 import Link from "next/link"
-//import { DeploymentStatus } from "@/components/deployment-status"
 import { DeploymentStatus } from "@/components/deployment-status"
+
 interface DashboardStats {
   totalCameras: number
   activeCameras: number
@@ -46,18 +46,26 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const [statsResponse, alertsResponse] = await Promise.all([
-        fetch("/api/dashboard-stats"),
-        fetch("/api/alerts?limit=3&status=active"),
+      const [statsResponse, alertsResponse] = await Promise.allSettled([
+        fetch("/api/dashboard-stats").catch((err) => {
+          console.log("[v0] Dashboard stats fetch failed:", err.message)
+          return null
+        }),
+        fetch("/api/alerts?limit=3&status=active").catch((err) => {
+          console.log("[v0] Alerts fetch failed:", err.message)
+          return null
+        }),
       ])
 
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json()
+      // Handle stats response
+      if (statsResponse.status === "fulfilled" && statsResponse.value && statsResponse.value.ok) {
+        const statsData = await statsResponse.value.json()
         setStats(statsData)
         setBackendConnected(!statsData.error) // Check if there's an error field
+        console.log("[v0] Dashboard stats loaded:", statsData)
       } else {
         // Fallback when backend is not available
-        console.warn("Backend not available, using fallback data")
+        console.log("[v0] Using fallback dashboard stats")
         setStats({
           totalCameras: 4,
           activeCameras: 0, // Show 0 when backend is down
@@ -67,12 +75,17 @@ export default function Dashboard() {
         setBackendConnected(false)
       }
 
-      if (alertsResponse.ok) {
-        const alertsData = await alertsResponse.json()
+      // Handle alerts response
+      if (alertsResponse.status === "fulfilled" && alertsResponse.value && alertsResponse.value.ok) {
+        const alertsData = await alertsResponse.value.json()
         setRecentAlerts(alertsData.alerts || [])
+        console.log("[v0] Recent alerts loaded:", alertsData.alerts?.length || 0, "alerts")
+      } else {
+        console.log("[v0] No alerts data available")
+        setRecentAlerts([])
       }
     } catch (error) {
-      console.error("Failed to fetch dashboard data:", error)
+      console.error("[v0] Dashboard data fetch error:", error)
       setBackendConnected(false)
       // Show system offline state
       setStats({
@@ -81,6 +94,7 @@ export default function Dashboard() {
         alertsToday: 0,
         detectionAccuracy: 0,
       })
+      setRecentAlerts([])
     } finally {
       setLoading(false)
     }
