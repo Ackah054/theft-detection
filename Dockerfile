@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci  # install both prod + dev deps (needed for Next.js build)
 
 # Copy source code
 COPY . .
@@ -17,6 +17,9 @@ RUN npm run build
 FROM python:3.9-slim AS backend
 
 WORKDIR /app
+
+# Avoid interactive debconf issues
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install system dependencies for OpenCV and other packages
 RUN apt-get update && apt-get install -y \
@@ -33,16 +36,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy Flask application
-COPY app.py .
-COPY templates/ templates/
+COPY app.py ./
+COPY templates/ ./templates/
 
+# Ensure static directory exists
 RUN mkdir -p static
-# Use shell command to copy static files if they exist, otherwise create empty directory
-RUN if [ -d "static" ]; then echo "Static directory exists"; else mkdir -p static && echo "Created empty static directory"; fi
 
 # Copy the built Next.js app from frontend stage
 COPY --from=frontend-builder /app/.next ./.next
