@@ -45,33 +45,42 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get("limit") || "50"
     const offset = searchParams.get("offset") || "0"
 
-    const flaskUrl = new URL("http://localhost:5000/api/alerts")
+    const backendUrl = process.env.FLASK_BACKEND_URL || "http://localhost:5000"
+    const flaskUrl = new URL(`${backendUrl}/api/alerts`)
     if (status) flaskUrl.searchParams.set("status", status)
     if (type) flaskUrl.searchParams.set("type", type)
     if (severity) flaskUrl.searchParams.set("severity", severity)
     flaskUrl.searchParams.set("limit", limit)
     flaskUrl.searchParams.set("offset", offset)
 
-    const flaskResponse = await fetch(flaskUrl.toString())
+    console.log("[v0] Fetching alerts from:", flaskUrl.toString())
+
+    const flaskResponse = await fetch(flaskUrl.toString(), {
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    })
 
     if (!flaskResponse.ok) {
-      throw new Error(`Flask backend error: ${flaskResponse.statusText}`)
+      const errorText = await flaskResponse.text()
+      console.error("[v0] Flask backend error:", flaskResponse.status, errorText)
+      throw new Error(`Flask backend error: ${flaskResponse.status} - ${errorText}`)
     }
 
     const alertsData = await flaskResponse.json()
 
     return NextResponse.json({
       alerts: alertsData.alerts || [],
-      total: alertsData.total || 0,
+      stats: alertsData.stats || {},
+      total: alertsData.total || alertsData.filtered_count || 0,
       offset: Number.parseInt(offset),
       limit: Number.parseInt(limit),
     })
   } catch (error) {
-    console.error("Get alerts API error:", error)
+    console.error("[v0] Get alerts API error:", error)
     return NextResponse.json(
       {
-        error: "Failed to fetch alerts from backend. Please ensure the Flask server is running.",
+        error: `Failed to fetch alerts from backend: ${error instanceof Error ? error.message : "Unknown error"}`,
         alerts: [],
+        stats: { total: 0, active: 0, acknowledged: 0, resolved: 0 },
         total: 0,
         offset: 0,
         limit: 50,
@@ -93,25 +102,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const flaskResponse = await fetch("http://localhost:5000/api/alerts", {
+    const backendUrl = process.env.FLASK_BACKEND_URL || "http://localhost:5000"
+    const flaskResponse = await fetch(`${backendUrl}/api/alerts`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10000),
     })
 
     if (!flaskResponse.ok) {
-      throw new Error(`Flask backend error: ${flaskResponse.statusText}`)
+      const errorText = await flaskResponse.text()
+      console.error("[v0] Flask backend error:", flaskResponse.status, errorText)
+      throw new Error(`Flask backend error: ${flaskResponse.status} - ${errorText}`)
     }
 
     const newAlert = await flaskResponse.json()
     return NextResponse.json(newAlert, { status: 201 })
   } catch (error) {
-    console.error("Create alert API error:", error)
+    console.error("[v0] Create alert API error:", error)
     return NextResponse.json(
       {
-        error: "Failed to create alert. Please ensure the Flask server is running.",
+        error: `Failed to create alert: ${error instanceof Error ? error.message : "Unknown error"}`,
       },
       { status: 500 },
     )
@@ -134,25 +147,29 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Status field required" }, { status: 400 })
     }
 
-    const flaskResponse = await fetch(`http://localhost:5000/api/alerts/${alertId}`, {
+    const backendUrl = process.env.FLASK_BACKEND_URL || "http://localhost:5000"
+    const flaskResponse = await fetch(`${backendUrl}/api/alerts/${alertId}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10000),
     })
 
     if (!flaskResponse.ok) {
-      throw new Error(`Flask backend error: ${flaskResponse.statusText}`)
+      const errorText = await flaskResponse.text()
+      console.error("[v0] Flask backend error:", flaskResponse.status, errorText)
+      throw new Error(`Flask backend error: ${flaskResponse.status} - ${errorText}`)
     }
 
     const updatedAlert = await flaskResponse.json()
     return NextResponse.json(updatedAlert)
   } catch (error) {
-    console.error("Update alert API error:", error)
+    console.error("[v0] Update alert API error:", error)
     return NextResponse.json(
       {
-        error: "Failed to update alert. Please ensure the Flask server is running.",
+        error: `Failed to update alert: ${error instanceof Error ? error.message : "Unknown error"}`,
       },
       { status: 500 },
     )

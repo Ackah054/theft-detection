@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask_cors import CORS
 import os
 import json
 import base64
@@ -13,6 +14,8 @@ from datetime import datetime, timedelta
 import uuid
 
 app = Flask(__name__)
+
+CORS(app, origins=["*"])  # In production, specify your frontend domain
 
 MODEL_PATH = 'theft_detection_model.h5'
 model = None
@@ -606,4 +609,6 @@ if __name__ == '__main__':
     else:
         print("⚠️  Using mock detection - place theft_detection_model.h5 in root directory")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    app.run(debug=debug, host='0.0.0.0', port=port)

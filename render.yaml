@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: shopguard-ai
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 300 app:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHONPATH
+        value: /opt/render/project/src
+    disk:
+      name: shopguard-storage
+      mountPath: /opt/render/project/src/uploads
+      sizeGB: 1
+
+  - type: web
+    name: shopguard-frontend
+    env: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: FLASK_BACKEND_URL
+        fromService:
+          type: web
+          name: shopguard-ai
+          property: host

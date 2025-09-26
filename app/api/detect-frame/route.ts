@@ -30,7 +30,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid image format" }, { status: 400 })
     }
 
-    const flaskResponse = await fetch("http://localhost:5000/api/detect-frame", {
+    const backendUrl = process.env.FLASK_BACKEND_URL || "http://localhost:5000"
+
+    console.log("[v0] Sending frame detection request to:", backendUrl)
+
+    const flaskResponse = await fetch(`${backendUrl}/api/detect-frame`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -40,19 +44,30 @@ export async function POST(request: NextRequest) {
         camera_id: body.camera_id || "live_cam",
         location: body.location || "Live Camera Feed",
       }),
+      signal: AbortSignal.timeout(30000), // 30 second timeout for AI processing
     })
 
     if (!flaskResponse.ok) {
-      throw new Error(`Flask backend error: ${flaskResponse.statusText}`)
+      const errorText = await flaskResponse.text()
+      console.error("[v0] Flask backend error:", flaskResponse.status, errorText)
+      throw new Error(`Flask backend error: ${flaskResponse.status} - ${errorText}`)
     }
 
     const detectionResult = await flaskResponse.json()
+    console.log("[v0] Detection result received:", detectionResult)
+
     return NextResponse.json(detectionResult)
   } catch (error) {
-    console.error("Detection API error:", error)
+    console.error("[v0] Detection API error:", error)
+
+    if (error instanceof Error && error.name === "AbortError") {
+      return NextResponse.json({ error: "Detection request timed out. Please try again." }, { status: 408 })
+    }
+
     return NextResponse.json(
       {
-        error: "Failed to connect to AI detection backend. Please ensure the Flask server is running.",
+        error: `Failed to connect to AI detection backend: ${error instanceof Error ? error.message : "Unknown error"}`,
+        details: "Please ensure the Flask server is running and accessible.",
       },
       { status: 500 },
     )

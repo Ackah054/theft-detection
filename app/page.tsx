@@ -46,14 +46,14 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       const [statsResponse, alertsResponse] = await Promise.all([
-        fetch("http://localhost:5000/api/dashboard-stats"),
+        fetch("/api/dashboard-stats"),
         fetch("/api/alerts?limit=3&status=active"),
       ])
 
       if (statsResponse.ok) {
         const statsData = await statsResponse.json()
         setStats(statsData)
-        setBackendConnected(true)
+        setBackendConnected(!statsData.error) // Check if there's an error field
       } else {
         // Fallback when backend is not available
         console.warn("Backend not available, using fallback data")

@@ -58,16 +58,24 @@ export async function POST(request: NextRequest) {
     const flaskFormData = new FormData()
     flaskFormData.append("video", videoFile)
 
-    const flaskResponse = await fetch("http://localhost:5000/api/analyze-video", {
+    const backendUrl = process.env.FLASK_BACKEND_URL || "http://localhost:5000"
+
+    console.log("[v0] Connecting to Flask backend at:", backendUrl)
+
+    const flaskResponse = await fetch(`${backendUrl}/api/analyze-video`, {
       method: "POST",
       body: flaskFormData,
+      signal: AbortSignal.timeout(300000), // 5 minute timeout for video processing
     })
 
     if (!flaskResponse.ok) {
-      throw new Error(`Flask backend error: ${flaskResponse.statusText}`)
+      const errorText = await flaskResponse.text()
+      console.error("[v0] Flask backend error:", flaskResponse.status, errorText)
+      throw new Error(`Flask backend error: ${flaskResponse.status} - ${errorText}`)
     }
 
     const flaskResults = await flaskResponse.json()
+    console.log("[v0] Flask results received:", flaskResults)
 
     // Generate unique analysis ID
     const analysisId = `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -129,10 +137,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response)
   } catch (error) {
-    console.error("Video analysis API error:", error)
+    console.error("[v0] Video analysis API error:", error)
+
+    if (error instanceof Error && error.name === "AbortError") {
+      return NextResponse.json({ error: "Video analysis timed out. Please try with a shorter video." }, { status: 408 })
+    }
+
     return NextResponse.json(
       {
-        error: "Failed to connect to AI analysis backend. Please ensure the Flask server is running.",
+        error: `Failed to connect to AI analysis backend: ${error instanceof Error ? error.message : "Unknown error"}`,
+        details: "Please ensure the Flask server is running and accessible.",
       },
       { status: 500 },
     )
@@ -149,7 +163,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const flaskResponse = await fetch(`http://localhost:5000/api/analysis-status?id=${analysisId}`)
+    const backendUrl = process.env.FLASK_BACKEND_URL || "http://localhost:5000"
+    const flaskResponse = await fetch(`${backendUrl}/api/analysis-status?id=${analysisId}`)
 
     if (!flaskResponse.ok) {
       return NextResponse.json({
