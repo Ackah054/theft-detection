@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Camera, Upload, Shield, AlertTriangle, Activity, Eye } from "lucide-react"
 import Link from "next/link"
-
+//import { DeploymentStatus } from "@/components/deployment-status"
+import { DeploymentStatus } from "@/components/deployment-status"
 interface DashboardStats {
   totalCameras: number
   activeCameras: number
@@ -124,6 +125,8 @@ export default function Dashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        <DeploymentStatus />
+
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>
