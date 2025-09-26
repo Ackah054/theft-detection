@@ -591,24 +591,25 @@ def static_files(filename):
     return send_from_directory('static', filename)
 
 if __name__ == '__main__':
-    # Create static directory if it doesn't exist
+    # Only run with Flask’s built-in server in local dev
     os.makedirs('static', exist_ok=True)
     os.makedirs('templates', exist_ok=True)
-    
+
     print("🤖 Loading theft detection model...")
     model_loaded = load_theft_model()
-    
+
     print("🚀 ShopGuard AI Detection System Starting...")
     print("📱 Dashboard: http://localhost:5000")
     print("📹 Live Monitor: http://localhost:5000/live-monitor")
     print("📤 Video Upload: http://localhost:5000/video-upload")
     print("🚨 Alerts: http://localhost:5000/alerts")
-    
+
     if model_loaded:
         print("✅ Real-time AI detection enabled")
     else:
-        print("⚠️  Using mock detection - place theft_detection_model.h5 in root directory")
-    
+        print("⚠️ Using mock detection - place theft_detection_model.h5 in root directory")
+
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') != 'production'
     app.run(debug=debug, host='0.0.0.0', port=port)
+
